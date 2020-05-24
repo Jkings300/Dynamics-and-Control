@@ -58,9 +58,7 @@ known_prefixes = ['numpy', 'scipy',
                   'sympy', 'mpmath', 'pandas',
                   'plt',
                   'control',
-                  'tclab',
-                  'tbcontrol',
-                  'blocksim'
+                  # 'tclab',
                   ]
 
 sortedfunctions = list(all_functions)

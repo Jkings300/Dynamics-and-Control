@@ -131,7 +131,7 @@ class AlgebraicEquation(Block):
     def derivative(self, e):
         return 0
 
-    
+
 class Deadtime(Block):
     def __init__(self, name, inputname, outputname, delay):
         super().__init__(name, inputname, outputname)
@@ -161,23 +161,12 @@ class Deadtime(Block):
     def derivative(self, e):
         return 0
 
-    
 class DiscreteTF(Block):
     
     def __init__(self, name, input_name, output_name, dt, numerator, denominator):
         """
         Represents a discrete transfer function.
-        
-        The TF must be of the form: 
-        
-                  -1       -2            -n
-        b  +  b  z   + b  z  + ... + b  z  
-         0     1        2             n
-        -----------------------------------
-                  -1       -2            -m
-        a  +  a  z   + a  z  + ... + a  z  
-         0     1        2             m
-
+        The TF must be of the form: (b_N * z**(-N) + ... + b_0)/(a_M z**(-M) + ... + a_0 ).
 
         Parameters
         ----------
@@ -185,20 +174,17 @@ class DiscreteTF(Block):
             The sampling time of the transfer function.
         numerator : array_like
             The numerator coefficient vector in a 1-D sequence.
-            [b_0, ..., b_n]
+            [b_N, ..., b_0]
         denominator : array_like
             The denominator coefficient vector in a 1-D sequence.
-            [a_0, ..., a_m]; a_0 != 0
+            [a_N, ..., a_0]; a_0 != 0
 
         """
         super().__init__(name, input_name, output_name)
 
-        if denominator[0] == 0:
-            raise ValueError('The leading coefficient of the denominator cannot be zero')
-        
         self.dt = dt
-        self.y_cos = denominator[::-1]
-        self.u_cos = numerator[::-1]
+        self.y_cos = denominator
+        self.u_cos = numerator
 
         self.ys = numpy.zeros(len(self.y_cos))
         self.us = numpy.zeros(len(self.u_cos))
@@ -246,15 +232,6 @@ class Diagram:
         :param blocks: list of blocks
         :param sums: sums specified as dictionaries with keys equal to output signal and values as tuples of strings of the form "<sign><signal>"
         :param inputs: inputs specified as dictionaries with keys equal to signal names and values functions of time
-        
-        
-        Example
-        
-        >>> blocks = [Gc, G]
-        >>> sums = {'e': ('+ysp', '-y')}
-        >>> inputs = {'ysp': step()}
-        >>> diagram = Diagram(blocks, sums, inputs)
-        
         """
         if not all(isinstance(block, Block) for block in blocks):
             raise TypeError("blocks must be a list of blocks")
@@ -300,7 +277,7 @@ class Diagram:
         """
 
         if progress:
-            from tqdm.auto import tqdm as tqdm
+            from tqdm import tqdm_notebook as tqdm
             pbar = tqdm(total=len(ts))
         dt = ts[1]
         outputs = defaultdict(list)
@@ -319,65 +296,9 @@ class Diagram:
 
 # Input functions
 def step(initial=0, starttime=0, size=1):
-    """Return a function which can be used to simulate a step"""
     def stepfunction(t):
         if t < starttime:
             return initial
         else:
             return initial + size
     return stepfunction
-
-
-def zero(t):
-    """This function returns zero for all time"""
-    return 0
-
-
-def simple_control_diagram(Gc, G, Gd=None, Gm=None, ysp=step(), d=zero):
-    """Construct a simple control diagram for quick controller simulations
-    
-                                  | d
-                               ┌─────┐
-                               │ Gd  │
-                               └──┬──┘
-                                  │ yd
- ysp +  e ┌──────┐  u  ┌─────┐ yu v     y
-    ──>o─>│  Gc  ├────>│  G  ├───>o─┬──>
-      ─↑  └──────┘     └─────┘      │
-       │                            │
-       │  ym     ┌─────┐            │
-       └─────────┤ Gm  │<───────────┘
-                 └─────┘
-
-    
-    Required arguments:
-    
-    Gc: Controller, a blocksim.Block with name='Gc', input='e', output='u' 
-    G: System, a blocksim.Block with name='G', input='u', output='yu'
-    
-    Optional arguments:
-    Gd: disturbance response, a blocksim.Block with name='Gd', input='d', output='yd'
-    ysp: a function of time to represent the input
-    d: a function of time to represent the disturbance
-    
-    Returns
-    
-    blocksim.Diagram object representing this diagram
-    
-    """
-    
-    if Gd is None:
-        Gd = Zero('Gd', 'd', 'yd')
-    
-    if Gm is None:
-        Gm = LTI('Gm', 'y', 'ym', 1)
-    
-    blocks = [Gc, G, Gd, Gm]
-    
-    sums = {'e': ('+ysp', '-ym'),
-            'y': ('+yu', '+yd')}
-    
-    inputs = {'ysp': ysp,
-              'd': d}
-    
-    return Diagram(blocks, sums, inputs)

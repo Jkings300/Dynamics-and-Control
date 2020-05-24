@@ -6,4 +6,3 @@ build
 dist
 _build
 *.egg-info
-.idea
